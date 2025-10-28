@@ -10,9 +10,15 @@ dados = read.csv("poemas.csv")
 ```
 
 ```{r}
+autores = c("Fernando Pessoa", "Sophia de Mello Breyner Andresen")
+interesse = dados$Author %in% autores
+futuro = dados[interesse,]
+dados = dados[!interesse, ]
+
+
 dados$Content -> palavras
 palavras = palavras |> tolower() |>
-  head() |> 
+  head(50) |> 
   paste() |>
   gsub(pattern = "\n", replacement = " ") |>
   gsub(pattern = "[^[:alpha:] ]", replacement = "") |> 
@@ -20,7 +26,7 @@ palavras = palavras |> tolower() |>
   strsplit(split = " ") |>
   unlist()
 palavras = palavras[palavras != ""] |> paste0("_")
-palavras
+#palavras
 ```
 
 ```{r}
@@ -50,6 +56,7 @@ criar_glossario = function(corpus, nmax = 100){
   glossario = c(letters, "_")
   
   for(i in 1:nmax){
+    print(i)
     itens = get_itens(glossario)
     pares = get_letter_pairs(corpus, itens)
     names(pares) = NULL
@@ -95,5 +102,53 @@ tokenizar(c("parente", "semente"), glossario)
 
 ```
 
+```{r}
+dado_embedding = dados$Content |> tolower() |>
+  tail(100) |> 
+  paste() |>
+  gsub(pattern = "\n", replacement = " ") |>
+  gsub(pattern = "[^[:alpha:] ]", replacement = "") |> 
+  iconv(to = "ASCII//TRANSLIT") |> 
+  strsplit(split = " ") |>
+  unlist()
+dado_embedding = dado_embedding |> tokenizar(glossario)
+```
 
+
+```{r}
+fernando = futuro[futuro$Author == autores[1],]
+sophia = futuro[futuro$Author == autores[2], ]
+nf = (nrow(fernando)*0.8) |> round()
+ns = (nrow(sophia)*0.8) |> round()
+idx_f = sample(1:nrow(fernando),nf)
+idx_s = sample(1:nrow(sophia), ns)
+f_treino = fernando[idx_f,]
+f_teste = fernando[-idx_f,]
+s_treino = sophia[idx_s,]
+s_teste = sophia[-idx_s,]
+treino = rbind(f_treino, s_treino)
+teste = rbind(f_teste, s_teste)
+treino = treino[sample(1:nrow(treino)),]
+teste = teste[sample(1:nrow(teste)),]
+
+```
+
+```{r}
+limpar_texto = function(texto){
+  palavras = texto |> tolower() |>
+    gsub(pattern = "\n", replacement = " ") |>
+    gsub(pattern = "[^[:alpha:] ]", replacement = "") |> 
+    iconv(to = "ASCII//TRANSLIT") |> 
+    strsplit(split = " ") |>
+    unlist()
+  palavras = palavras[palavras != ""]
+  return(palavras)
+}
+limpar_texto = Vectorize(limpar_texto)
+```
+
+```{r}
+txt_treino = limpar_texto(treino$Content) |> lapply(tokenizar, glossario = glossario)
+txt_teste = limpar_texto(teste$Content) |> lapply(tokenizar, glossario = glossario)
+```
 
