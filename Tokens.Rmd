@@ -1,0 +1,99 @@
+---
+title: "Tokens"
+output: html_document
+---
+
+##BPE TOKENIZATION
+
+```{r}
+dados = read.csv("poemas.csv")
+```
+
+```{r}
+dados$Content -> palavras
+palavras = palavras |> tolower() |>
+  head() |> 
+  paste() |>
+  gsub(pattern = "\n", replacement = " ") |>
+  gsub(pattern = "[^[:alpha:] ]", replacement = "") |> 
+  iconv(to = "ASCII//TRANSLIT") |> 
+  strsplit(split = " ") |>
+  unlist()
+palavras = palavras[palavras != ""] |> paste0("_")
+palavras
+```
+
+```{r}
+get_letter_pairs = function(word, itens) {
+  n = nchar(word)
+  substrings = list()
+  for(i in 1:(n-1)){
+    substrings[[i]] = substring(word, 1:(n-i), (i+1):n)
+  }
+  substrings = unlist(substrings)
+  substrings = substrings[substrings %in% itens]
+  contagem = table(substrings) |> unlist()
+  contagem = list(contagem)
+  return(contagem)
+}
+
+get_letter_pairs = Vectorize(get_letter_pairs, "word")
+
+
+get_itens = function(glossario){
+  itens = expand.grid(glossario, glossario)
+  itens = paste0(itens$Var1, itens$Var2)
+  return(itens)
+}
+
+criar_glossario = function(corpus, nmax = 100){
+  glossario = c(letters, "_")
+  
+  for(i in 1:nmax){
+    itens = get_itens(glossario)
+    pares = get_letter_pairs(corpus, itens)
+    names(pares) = NULL
+    pares = pares |> unlist() |> names() |> table() 
+    pares = pares[!(names(pares) %in% glossario)]
+    par = pares |> which.max() |> names()
+    glossario = c(glossario, par)
+  }
+  
+  return(glossario)
+  
+}
+glossario = criar_glossario(palavras)
+```
+
+```{r}
+tokenizar = function(palavra, glossario) {
+  palavra = paste0(palavra, "_")
+  toks = c()
+  
+  while (nchar(palavra) > 0) {
+    encontrado = FALSE
+    for (tam in seq(nchar(palavra), 1, -1)) {
+      candidato = substr(palavra, 1, tam)
+      if (candidato %in% glossario) {
+        toks = c(toks, candidato)
+        palavra = substr(palavra, tam + 1, nchar(palavra))
+        encontrado = TRUE
+        break
+      }
+    }
+    if (!encontrado) {
+      toks = c(toks, substr(palavra, 1, 1))
+      palavra = substr(palavra, 2, nchar(palavra))
+    }
+  }
+  toks
+}
+
+tokenizar = Vectorize(tokenizar, "palavra")
+
+tokenizar(c("parente", "semente"), glossario)
+
+```
+
+
+
