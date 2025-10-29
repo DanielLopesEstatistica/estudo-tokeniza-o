@@ -111,7 +111,7 @@ dado_embedding = dados$Content |> tolower() |>
   iconv(to = "ASCII//TRANSLIT") |> 
   strsplit(split = " ") |>
   unlist()
-dado_embedding = dado_embedding |> tokenizar(glossario)
+dado_embedding = dado_embedding |> tokenizar(glossario) |> unlist()
 ```
 
 
