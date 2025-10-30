@@ -93,18 +93,29 @@ tokenizar = function(palavra, glossario) {
       palavra = substr(palavra, 2, nchar(palavra))
     }
   }
-  toks
+  return(toks)
 }
 
 tokenizar = Vectorize(tokenizar, "palavra")
-
-tokenizar(c("parente", "semente"), glossario)
-
 ```
 
 ```{r}
+somar_submatriz = function(M, S) {
+  lin = intersect(rownames(M), rownames(S))
+  col = intersect(colnames(M), colnames(S))
+  M[lin, col] = M[lin, col] + S[lin, col]
+  return(M)
+}
+
+criar_matriz = function(n) {
+  i = 1:n
+  j = 1:n
+  m = outer(i, j, function(i, j) n - abs(i - j))
+  return(m)
+}
+
 dado_embedding = dados$Content |> tolower() |>
-  tail(100) |> 
+  tail(1000) |> 
   paste() |>
   gsub(pattern = "\n", replacement = " ") |>
   gsub(pattern = "[^[:alpha:] ]", replacement = "") |> 
@@ -112,6 +123,26 @@ dado_embedding = dados$Content |> tolower() |>
   strsplit(split = " ") |>
   unlist()
 dado_embedding = dado_embedding |> tokenizar(glossario) |> unlist()
+
+n = length(glossario)
+janela = 10
+cooc = matrix(0, n, n, dimnames = list(glossario, glossario))
+n_dados = length(dado_embedding)
+
+for(i in 1:n_dados){
+  ini = max(1, i - janela)
+  fim = min(n_dados, i + janela)
+  ctx = dado_embedding[ini:fim]
+  tamanho_janela = fim-ini+1
+  matriz = criar_matriz(tamanho_janela)
+  colnames(matriz) = ctx
+  rownames(matriz) = ctx
+  cooc = somar_submatriz(cooc, matriz)
+}
+
+sv = svd(cooc)
+emb = sv$u[, 1:100]  
+rownames(emb) = glossario
 ```
 
 
@@ -148,7 +179,72 @@ limpar_texto = Vectorize(limpar_texto)
 ```
 
 ```{r}
-txt_treino = limpar_texto(treino$Content) |> lapply(tokenizar, glossario = glossario)
-txt_teste = limpar_texto(teste$Content) |> lapply(tokenizar, glossario = glossario)
+txt_treino = limpar_texto(treino$Content) |> lapply(tokenizar, glossario = glossario) |> unname()
+
+txt_teste = limpar_texto(teste$Content) |> lapply(tokenizar, glossario = glossario) |> unname()
+```
+
+```{r}
+embedding_lista = function(M, L) {
+  res = lapply(L, function(v) {
+    v = unlist(v)
+    if (is.character(v)) v = match(v, rownames(M))
+    cm = colMeans(M[v, , drop=FALSE])
+    unname(cm) 
+  })
+  res = do.call(rbind, res)
+  colnames(res) = colnames(M)
+  rownames(res) = names(L)
+  return(res)
+}
+
+emb_treino = embedding_lista(emb, txt_treino)
+emb_treino[is.nan(emb_treino)] = 0
+emb_teste = embedding_lista(emb, txt_teste)
+emb_teste[is.nan(emb_teste)] = 0
+```
+
+## 1 = fernando pessoa
+## 2 = sophia de mello
+
+```{r}
+library(caret)
+library(xgboost)
+
+y_treino = treino$Author |> as.factor() |> as.numeric() 
+y_treino = y_treino - 1
+y_teste = teste$Author |> as.factor() |> as.numeric()
+y_teste = y_teste - 1
+dtreino = xgb.DMatrix(data = emb_treino, label = y_treino)
+dteste = xgb.DMatrix(data = emb_teste, label = y_teste)
+
+if(!exists("modelo_poemas", envir = .GlobalEnv)){
+  modelo_poemas = xgboost(
+    data = dtreino,
+    objective = "multi:softprob", 
+    num_class = 2,
+    nrounds = 100,
+    verbose = 0
+  )
+}
+```
+
+```{r}
+library(dplyr) 
+
+predizer = function(modelo, dados){
+  predicoes = predict(modelo, dados, reshape = TRUE) |> as.data.frame()
+  predicoes = predicoes %>% 
+    mutate(num_predicao = max.col(., ties.method = "first") - 1)
+  return(predicoes)
+}
+
+predicoes <- predizer(modelo_poemas, emb_teste)
+
+confusao = table(predicoes$num_predicao, y_teste)
+
+acuracia = sum(diag(confusao))/sum(confusao)
+acuracia
+confusao
 ```
 
