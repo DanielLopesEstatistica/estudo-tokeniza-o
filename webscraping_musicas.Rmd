@@ -1,0 +1,122 @@
+---
+title: "webscraping_musicas"
+output: html_document
+---
+
+```{r}
+library(rvest)
+
+urls = readLines("sophiachablau.txt")
+lista_letras = list()
+lista_titulos = list()
+for(i in 1:length(urls)){
+  url = urls[i]
+  pg = read_html(url)
+  letra = pg |> html_elements("div.lyric-original") |> html_text2()
+  titulo = pg |> html_elements("h1.textStyle-primary") |> html_text2()
+  lista_letras[[i]] = letra
+  lista_titulos[[i]] = titulo
+}
+
+df = data.frame(titulo = unlist(lista_titulos),
+                letra = unlist(lista_letras),
+                artista = "sophia")
+
+```
+
+```{r}
+la_vem = c("Quantos serão no final?",
+           "Lá vem como uma estrela
+um cometa, uma força destrutiva
+ela vai cair, ela vai fazer você cair em si
+
+Lá vem como uma ideia
+não pergunta, não hesita, te desmancha,
+não te pica, ela te fere, te acaba e não tem vida pra viver
+
+Ela quer te matar,
+ela nasceu pra morrer
+
+Bomba de gás, mísseis e mais
+Quantos Omar morrerão?
+Bomba de gás, mísseis e mais
+Quantos serão no final?
+
+Lá vem como uma estrela
+um cometa, uma força destrutiva
+ela vai cair, ela vai fazer você cair em si
+
+Lá vem como uma ideia
+não pergunta, não hesita, te desmancha,
+não te pica, ela te fere, te acaba e não tem vida pra viver
+
+Ela quer te matar,
+ela nasceu pra morrer
+
+Bomba de gás, mísseis e mais
+Quantos Omar morrerão?
+Bomba de gás, mísseis e mais
+Quantos serão no final?
+",
+"sophia")
+
+cancao_do_retorno = c("Canção do retorno",
+                      "Quando você pôr os pés no seu país
+Quando você caminhar pela praça
+Quando você reparar que foram derrubadas as estátuas
+de um grande ditador
+
+Não vai chorar e nem saber
+o que dizer
+Você voltou, você venceu
+Sua revanche, sua glória
+É mais um passo nesse espaço
+É mais um metro da fronteira
+Um horizonte, uma palavra, uma cidade inteira
+
+Que cai ao seus pés (que caiam aos seus pés),
+Que pede perdão (que te peçam perdão)
+E que amanhã amanhece igual
+
+E que amanhã amanheçam iguais",
+"sophia")
+
+df[nrow(df)+1,] = la_vem
+df[nrow(df)+1,] = cancao_do_retorno
+write.table(df, "sophia.csv", sep = ";;;")
+
+```
+
+
+```{r}
+url = "https://www.letras.mus.br/chico-buarque/mais_acessadas.html"
+
+pg = read_html(url)
+
+links = pg |> 
+  html_elements("li.songList-table-row.--song.isVisible") |> 
+  html_attr("data-shareurl")
+
+#links
+pegar = 200
+urls = links[1:pegar]
+
+lista_letras = list()
+lista_titulos = list()
+for(i in 1:length(urls)){
+  print(i)
+  url = urls[i]
+  pg = read_html(url)
+  letra = pg |> html_elements("div.lyric-original") |> html_text2()
+  titulo = pg |> html_elements("h1.textStyle-primary") |> html_text2()
+  lista_letras[[i]] = letra
+  lista_titulos[[i]] = titulo
+}
+
+df = data.frame(titulo = unlist(lista_titulos),
+                letra = unlist(lista_letras),
+                artista = "chico")
+
+write.table(df, "chico.csv", sep = ";;;")
+```
+
